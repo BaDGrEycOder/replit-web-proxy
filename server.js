@@ -5,10 +5,15 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieSession = require('cookie-session');
 const { URL } = require('url');
+const path = require('path');
 
 const app = express();
 app.use(helmet());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+
+// Serve static UI files from /public
+app.use('/static', express.static(path.join(__dirname, 'public')));
 
 // Session cookie for simple login
 app.use(cookieSession({
@@ -46,19 +51,9 @@ function requireAuth(req, res, next) {
   res.redirect('/login');
 }
 
+// UI routes
 app.get('/login', (req, res) => {
-  res.send(`<!doctype html>
-  <html>
-  <head><meta charset="utf-8"><title>Login</title></head>
-  <body style="font-family:system-ui,Arial">
-    <h2>Proxy login</h2>
-    <form method="POST" action="/login">
-      <input name="password" type="password" placeholder="Password" style="width:300px;padding:8px" />
-      <button type="submit" style="padding:8px 12px">Log in</button>
-    </form>
-    <p style="color:#555">Set the password in Replit Secrets: key PROXY_PASSWORD</p>
-  </body>
-  </html>`);
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
 app.post('/login', (req, res) => {
@@ -77,24 +72,11 @@ app.get('/logout', (req, res) => {
   res.redirect('/login');
 });
 
-// Main UI
 app.get('/', requireAuth, (req, res) => {
-  res.send(`<!doctype html>
-  <html>
-  <head><meta charset="utf-8"><title>Simple Proxy</title></head>
-  <body style="font-family:system-ui,Arial">
-    <h2>Simple Web Proxy (private)</h2>
-    <form method="GET" action="/proxy">
-      <input name="url" placeholder="https://example.com" style="width:70%;padding:8px" />
-      <button type="submit" style="padding:8px 12px">Go</button>
-    </form>
-    <p>Allowed hosts: ${ALLOW_HOSTS.join(', ')}</p>
-    <p><a href="/logout">Log out</a></p>
-  </body>
-  </html>`);
+  res.sendFile(path.join(__dirname, 'public', 'app.html'));
 });
 
-// Proxy endpoint
+// Proxy endpoint (unchanged, but left here to work with the new UI)
 app.all('/proxy', requireAuth, async (req, res) => {
   const rawUrl = req.query.url || req.body.url;
   if (!rawUrl) return res.status(400).send('Missing url parameter');

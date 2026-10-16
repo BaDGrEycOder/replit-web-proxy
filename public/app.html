@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Private Proxy</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container">
+      <div class="brand">Private Proxy</div>
+      <div class="actions">
+        <a href="/logout" class="link">Log out</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container page">
+    <section class="panel">
+      <h2>Browse a site</h2>
+      <form id="proxyForm" class="row" onsubmit="return goProxy()">
+        <input id="urlInput" placeholder="https://youtube.com" autocomplete="off">
+        <button type="submit" class="primary">Go</button>
+        <button id="openNew" type="button" class="secondary">Open in new tab</button>
+      </form>
+      <p class="muted">Allowed hosts: <span id="allowedList"></span></p>
+    </section>
+
+    <section class="panel preview">
+      <div id="notice" class="muted">Results will appear below. If a site refuses to display in an embedded view, use "Open in new tab".</div>
+      <iframe id="viewer" sandbox="allow-forms allow-scripts allow-same-origin" srcdoc="" title="Proxy viewer"></iframe>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

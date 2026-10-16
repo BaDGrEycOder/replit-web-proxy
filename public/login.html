@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login - Private Proxy</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="centered">
+  <div class="card">
+    <h1>Private Proxy</h1>
+    <p class="muted">Enter your password to continue</p>
+    <form method="POST" action="/login" class="stack">
+      <input name="password" type="password" placeholder="Password" required />
+      <button type="submit" class="primary">Log in</button>
+    </form>
+    <p class="muted small">Set the password in Replit Secrets: <code>PROXY_PASSWORD</code></p>
+  </div>
+</body>
+</html>
