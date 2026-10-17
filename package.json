@@ -1,6 +1,6 @@
 {
   "name": "replit-web-proxy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -11,6 +11,7 @@
     "express": "^4.18.2",
     "express-rate-limit": "^6.8.0",
     "got": "^12.0.0",
-    "helmet": "^7.0.0"
+    "helmet": "^7.0.0",
+    "tough-cookie": "^4.1.0"
   }
 }

@@ -12,6 +12,7 @@
       <div class="brand">Private Proxy</div>
       <div class="actions">
         <a href="/logout" class="link">Log out</a>
+        <a href="/admin" class="link">Admin</a>
       </div>
     </div>
   </header>
@@ -25,14 +26,66 @@
         <button id="openNew" type="button" class="secondary">Open in new tab</button>
       </form>
       <p class="muted">Allowed hosts: <span id="allowedList"></span></p>
+      <div style="margin-top:8px">
+        <button id="clearCookies" class="secondary">Clear cookies for this session</button>
+      </div>
     </section>
 
     <section class="panel preview">
       <div id="notice" class="muted">Results will appear below. If a site refuses to display in an embedded view, use "Open in new tab".</div>
       <iframe id="viewer" sandbox="allow-forms allow-scripts allow-same-origin" srcdoc="" title="Proxy viewer"></iframe>
     </section>
+
+    <section class="panel">
+      <h3>Copilot Chat</h3>
+      <p class="muted">Ask the Copilot about the page. It will include a short page summary if you check the box.</p>
+      <textarea id="aiPrompt" placeholder="Ask Copilot..." style="width:100%;height:80px;border-radius:8px;padding:8px"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="includePage"> Include page snippet</label>
+        <button id="aiSend" class="primary">Ask Copilot</button>
+      </div>
+      <pre id="aiResp" style="white-space:pre-wrap;margin-top:8px;background:#f8fafc;padding:12px;border-radius:8px"></pre>
+    </section>
   </main>
 
   <script src="/static/app.js"></script>
+  <script>
+    document.getElementById('clearCookies').addEventListener('click', async ()=>{
+      const r = await fetch('/api/clear-cookies', {method:'POST'});
+      if (r.ok) alert('Cookies cleared for this session'); else alert('Error');
+    });
+
+    document.getElementById('aiSend').addEventListener('click', async ()=>{
+      const prompt = document.getElementById('aiPrompt').value.trim();
+      if (!prompt) return alert('Type a question');
+      const include = document.getElementById('includePage').checked;
+      let pageText='';
+      let pageUrl='';
+      if (include){
+        // try to extract small snippet from iframe by fetching the proxied page text via /proxy?url=...&plain=1
+        const iframe = document.getElementById('viewer');
+        try{
+          // We can't read iframe content due to cross-origin; instead request server to fetch a short text summary
+          const current = iframe.getAttribute('src');
+          if (current){
+            pageUrl = current.replace('/proxy?url=','');
+            const decoded = decodeURIComponent(pageUrl);
+            // ask server to fetch small snippet by passing includePage flag and letting server fetch pageText? For simplicity, fetch page via /proxy?url=...
+            // We'll request the proxied URL with an extra query param '?__snippet=1' so server can return text.
+            const r = await fetch('/proxy?url='+encodeURIComponent(decoded)+'&__snippet=1');
+            if (r.ok){
+              pageText = await r.text();
+              if (pageText.length>2000) pageText = pageText.slice(0,2000);
+            }
+          }
+        }catch(e){ console.warn('snippet err', e); }
+      }
+      // send to AI
+      const res = await fetch('/api/ai', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({prompt, includePage: include, pageUrl, pageText})});
+      if (!res.ok){ const t=await res.text(); return alert('AI error: '+t); }
+      const json = await res.json();
+      document.getElementById('aiResp').textContent = json.answer || '(no answer)';
+    });
+  </script>
 </body>
 </html>
