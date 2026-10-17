@@ -166,37 +166,6 @@ app.post('/api/clear-cookies', requireAuth, (req, res) => {
   res.json({ok:true});
 });
 
-// AI endpoint
-app.post('/api/ai', requireAuth, async (req, res) => {
-  // Expect { prompt: string, includePage: boolean, pageUrl?: string, pageText?: string }
-  const { prompt, includePage, pageUrl, pageText } = req.body || {};
-  if (!prompt) return res.status(400).send('Missing prompt');
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return res.status(500).send('OPENAI_API_KEY not configured');
-
-  // Build messages
-  const system = `You are Copilot: an assistant to help the user browse. Be concise and helpful.`;
-  let messages = [{role:'system', content: system}, {role:'user', content: prompt}];
-  if (includePage && pageUrl && pageText) {
-    messages.push({role:'user', content: `Context from ${pageUrl}: ${pageText}`});
-  }
-
-  try {
-    const model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
-    const resp = await got.post('https://api.openai.com/v1/chat/completions', {
-      json: { model, messages, max_tokens: 500 },
-      headers: { Authorization: `Bearer ${key}` },
-      responseType: 'json',
-      timeout: { request: 30000 }
-    });
-    const ans = resp.body.choices && resp.body.choices[0] && resp.body.choices[0].message && resp.body.choices[0].message.content;
-    res.json({ok:true, answer: ans});
-  } catch (err) {
-    console.error('AI error', err && err.response && err.response.body ? err.response.body : err.message);
-    res.status(500).send('AI provider error');
-  }
-});
-
 // Proxy endpoint
 app.all('/proxy', requireAuth, async (req, res) => {
   const rawUrl = req.query.url || req.body.url;
