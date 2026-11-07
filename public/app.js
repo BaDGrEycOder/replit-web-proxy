@@ -16,6 +16,27 @@
   const resultTab = document.getElementById('resultTab');
   const browsePane = document.getElementById('browsePane');
   const resultPane = document.getElementById('resultPane');
+  const frameTimers = new WeakMap();
+  const LOAD_TIMEOUT_MS = 30000;
+
+  function loadInFrame(frame, url, host, label) {
+    clearTimeout(frameTimers.get(frame));
+    let completed = false;
+    notice.textContent = 'Loading ' + label + host + '…';
+    frame.addEventListener('load', function onLoad() {
+      if (completed) return;
+      completed = true;
+      clearTimeout(frameTimers.get(frame));
+      frame.removeEventListener('load', onLoad);
+      notice.textContent = label + host + ' responded. If the page is blank or incomplete, the site may block proxy or embedded access.';
+    }, { once: true });
+    frameTimers.set(frame, setTimeout(() => {
+      if (completed) return;
+      completed = true;
+      notice.textContent = label + host + ' has not responded after 30 seconds. It may be temporarily unavailable or block proxy access.';
+    }, LOAD_TIMEOUT_MS));
+    frame.src = url;
+  }
 
   function switchTab(which) {
     const showResult = which === 'result';
@@ -118,10 +139,9 @@
       return false;
     }
     const proxied = proxyUrl(normalized);
-    viewer.src = proxied;
+    loadInFrame(viewer, proxied, host, '');
     openNew.dataset.url = proxied;
     browseStatus.textContent = '';
-    notice.textContent = 'Loading ' + host + '…';
     switchTab('browse');
     return true;
   }
@@ -171,8 +191,8 @@
             searchStatus.textContent = 'This result is outside your configured allowlist. Ask the administrator to add its host before browsing it.';
             return;
           }
-          resultViewer.src = proxyUrl(normalized);
-          notice.textContent = 'Loading search result: ' + new URL(normalized).hostname + '…';
+          const host = new URL(normalized).hostname;
+          loadInFrame(resultViewer, proxyUrl(normalized), host, 'Search result: ');
           switchTab('result');
         });
         const description = document.createElement('p');
