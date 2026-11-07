@@ -16,13 +16,11 @@ app.use(helmet());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use('/static', express.static(path.join(__dirname, 'public')));
-
 app.use(cookieSession({
   name: 'session',
   keys: [process.env.SESSION_SECRET || 'change_this_secret'],
   maxAge: 24 * 60 * 60 * 1000
 }));
-
 app.use(rateLimit({
   windowMs: 60 * 1000,
   max: process.env.RATE_LIMIT_PER_MIN ? parseInt(process.env.RATE_LIMIT_PER_MIN, 10) : 60
@@ -32,39 +30,23 @@ const DATA_DIR = path.join(__dirname, 'data');
 const ALLOW_FILE = path.join(DATA_DIR, 'allowlist.json');
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
 if (!fsSync.existsSync(DATA_DIR)) fsSync.mkdirSync(DATA_DIR, { recursive: true });
-
-function normalizeHost(host) {
-  return String(host || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/$/, '');
-}
+const DEFAULT_ALLOW_HOSTS = ['spotify.com', 'youtube.com', 'yahoo.com', 'mail.yahoo.com'];
 
 async function loadAllowlist() {
   try {
-    const parsed = JSON.parse(await fs.readFile(ALLOW_FILE, 'utf8'));
-    if (!Array.isArray(parsed)) throw new Error('Invalid allowlist format');
-    const cleaned = [...new Set(parsed
-      .map(host => normalizeHost(host))
-      .filter(Boolean)
-      .filter(host => host !== 'amazon.com')
-      .filter(host => /^[a-z0-9.-]+$/.test(host)))];
-    await fs.writeFile(ALLOW_FILE, JSON.stringify(cleaned, null, 2));
+    const stored = JSON.parse(await fs.readFile(ALLOW_FILE, 'utf8'));
+    if (!Array.isArray(stored)) throw new Error('Invalid allowlist');
+    const cleaned = [...new Set(stored.map(host => String(host).trim().toLowerCase()).filter(host => host && host !== 'amazon.com'))];
+    if (JSON.stringify(cleaned) !== JSON.stringify(stored)) await fs.writeFile(ALLOW_FILE, JSON.stringify(cleaned, null, 2));
     return cleaned;
   } catch {
-    const defaults = ['spotify.com', 'youtube.com', 'yahoo.com', 'mail.yahoo.com'];
-    await fs.writeFile(ALLOW_FILE, JSON.stringify(defaults, null, 2));
-    return defaults;
+    await fs.writeFile(ALLOW_FILE, JSON.stringify(DEFAULT_ALLOW_HOSTS, null, 2));
+    return DEFAULT_ALLOW_HOSTS;
   }
 }
-
 async function saveAllowlist(list) {
-  const cleaned = [...new Set(list
-    .map(host => normalizeHost(host))
-    .filter(Boolean)
-    .filter(host => host !== 'amazon.com')
-    .filter(host => /^[a-z0-9.-]+$/.test(host)))];
-  await fs.writeFile(ALLOW_FILE, JSON.stringify(cleaned, null, 2));
-  return cleaned;
+  await fs.writeFile(ALLOW_FILE, JSON.stringify(list, null, 2));
 }
-
 async function loadStats() {
   try { return JSON.parse(await fs.readFile(STATS_FILE, 'utf8')); }
   catch {
@@ -83,8 +65,7 @@ loadAllowlist().then(list => { ALLOW_HOSTS = list; }).catch(console.error);
 loadStats().then(stats => { STATS = stats; }).catch(console.error);
 
 function isAllowedHost(hostname) {
-  const host = normalizeHost(hostname || '');
-  return Boolean(host) && ALLOW_HOSTS.some(domain => host === domain || host.endsWith('.' + domain));
+  return Boolean(hostname) && ALLOW_HOSTS.some(host => hostname === host || hostname.endsWith('.' + host));
 }
 
 const sessionJars = new Map();
@@ -97,44 +78,45 @@ function getJarForSession(req) {
   if (!sessionJars.has(sid)) sessionJars.set(sid, new CookieJar());
   return sessionJars.get(sid);
 }
-
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) return next();
-  return res.redirect('/login');
+  req.session.authenticated = true;
+  req.session.isAdmin = false;
+  return next();
 }
-
 function requireAdmin(req, res, next) {
   if (req.session && req.session.isAdmin) return next();
-  return res.status(403).send('Forbidden');
+  req.session.authenticated = true;
+  req.session.isAdmin = false;
+  return next();
 }
 
 app.get('/login', (req, res) => {
   req.session.authenticated = true;
-  req.session.isAdmin = true;
+  req.session.isAdmin = false;
   res.redirect('/');
 });
-
 app.post('/login', (req, res) => {
   req.session.authenticated = true;
-  req.session.isAdmin = true;
-  return res.redirect('/');
+  req.session.isAdmin = false;
+  res.redirect('/');
 });
-
 app.get('/logout', (req, res) => { req.session = null; res.redirect('/login'); });
 app.get('/', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'app.html')));
 app.get('/admin', requireAdmin, (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
-app.get('/api/admin/allowlist', requireAdmin, (req, res) => res.json(ALLOW_HOSTS));
-app.post('/api/admin/allowlist', requireAdmin, async (req, res) => {
+app.get('/api/admin/allowlist', requireAuth, (req, res) => res.json(ALLOW_HOSTS));
+app.post('/api/admin/allowlist', requireAuth, async (req, res) => {
   if (!Array.isArray(req.body.list)) return res.status(400).send('Invalid list');
-  const list = req.body.list.map(value => String(value).trim().toLowerCase()).filter(Boolean);
+  const list = req.body.list.map(value => String(value).trim().toLowerCase()).filter(host => host && host !== 'amazon.com');
   if (list.some(host => !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(host))) {
     return res.status(400).send('Enter hostnames only, such as example.com');
   }
-  ALLOW_HOSTS = await saveAllowlist(list);
+  ALLOW_HOSTS = [...new Set(list)];
+  await saveAllowlist(ALLOW_HOSTS);
   res.json({ ok: true, list: ALLOW_HOSTS });
 });
-app.get('/api/admin/stats', requireAdmin, (req, res) => res.json(STATS));
+app.get('/api/admin/stats', requireAuth, (req, res) => res.json(STATS));
 
 function fetchDuckDuckGo(query) {
   const searchUrl = new URL('https://html.duckduckgo.com/html/');
@@ -157,7 +139,6 @@ function fetchDuckDuckGo(query) {
     request.on('error', reject);
   });
 }
-
 app.get('/api/search', requireAuth, async (req, res) => {
   const query = String(req.query.q || '').trim().slice(0, 200);
   if (query.length < 2) return res.status(400).json({ error: 'Enter at least 2 characters to search.' });
@@ -196,7 +177,6 @@ app.post('/api/clear-cookies', requireAuth, (req, res) => {
 function proxyPath(url) {
   return '/proxy?url=' + encodeURIComponent(url);
 }
-
 function rewriteCss(css, baseUrl) {
   return css.replace(/url\(\s*(['"]?)(.*?)\1\s*\)/gi, (whole, quote, value) => {
     const trimmed = value.trim();
@@ -208,7 +188,6 @@ function rewriteCss(css, baseUrl) {
     } catch { return whole; }
   });
 }
-
 function rewriteHtml(html, baseUrl) {
   const $ = cheerio.load(html);
   const proxify = value => {
@@ -218,25 +197,21 @@ function rewriteHtml(html, baseUrl) {
       return proxyPath(resolved.href);
     } catch { return value; }
   };
-
   $('a[href], area[href], link[href], script[src], img[src], iframe[src], source[src], video[src], audio[src], form[action], input[src], video[poster]').each((_, element) => {
     const tag = element.tagName.toLowerCase();
     const attr = tag === 'form' ? 'action' : (element.attribs.action !== undefined ? 'action' : (element.attribs.poster !== undefined ? 'poster' : (element.attribs.href !== undefined ? 'href' : 'src')));
     const value = $(element).attr(attr);
     if (value) $(element).attr(attr, proxify(value));
   });
-
   $('[srcset]').each((_, element) => {
     const value = $(element).attr('srcset');
     if (!value) return;
-    const updated = value.split(',').map(candidate => {
+    $(element).attr('srcset', value.split(',').map(candidate => {
       const parts = candidate.trim().split(/\s+/);
       if (parts[0]) parts[0] = proxify(parts[0]);
       return parts.join(' ');
-    }).join(', ');
-    $(element).attr('srcset', updated);
+    }).join(', '));
   });
-
   $('style').each((_, element) => $(element).text(rewriteCss($(element).text(), baseUrl)));
   $('[style]').each((_, element) => $(element).attr('style', rewriteCss($(element).attr('style'), baseUrl)));
   $('body').prepend('<div style="position:fixed;left:0;right:0;top:0;background:#ffffffaa;backdrop-filter:blur(6px);border-bottom:1px solid #ddd;padding:6px;font-size:13px;z-index:9999;">Proxied via private web proxy</div><div style="height:36px;"></div>');
@@ -246,27 +221,34 @@ function rewriteHtml(html, baseUrl) {
 app.all('/proxy', requireAuth, async (req, res) => {
   const rawUrl = req.query.url || req.body.url;
   if (!rawUrl) return res.status(400).send('Missing url parameter');
-
   let target;
   try { target = new URL(rawUrl); }
   catch { return res.status(400).send('Invalid URL'); }
-
   if (!['http:', 'https:'].includes(target.protocol)) return res.status(400).send('Only HTTP and HTTPS URLs are allowed');
   if (!isAllowedHost(target.hostname)) return res.status(403).send('Host not allowed by proxy policy');
 
-  try {
-    const headers = { ...req.headers };
-    delete headers.host;
-    delete headers['content-length'];
+  // Helmet's app-wide CSP allows only same-origin scripts/styles. That policy
+  // prevents proxied sites from loading their own assets and makes many pages blank.
+  // The target remains constrained by the server-side host allowlist above.
+  res.removeHeader('Content-Security-Policy');
+  res.removeHeader('Content-Security-Policy-Report-Only');
 
+  try {
+    const headers = {
+      'user-agent': req.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+      accept: req.get('accept') || '*/*',
+      'accept-language': req.get('accept-language') || 'en-US,en;q=0.9'
+    };
+    if (req.get('content-type')) headers['content-type'] = req.get('content-type');
+    if (req.get('range')) headers.range = req.get('range');
     const upstream = got.stream(target.href, {
       method: req.method,
       headers,
       throwHttpErrors: false,
       cookieJar: getJarForSession(req),
-      timeout: { request: 45000, response: 20000, socket: 30000 }
+      timeout: { request: 45000, response: 20000, socket: 30000 },
+      ...(req.method !== 'GET' && req.method !== 'HEAD' ? { body: req } : {})
     });
-
     let byteCount = 0;
     upstream.on('response', upstreamRes => {
       res.status(upstreamRes.statusCode);
@@ -274,20 +256,15 @@ app.all('/proxy', requireAuth, async (req, res) => {
       ['content-type', 'cache-control', 'last-modified', 'etag', 'content-range', 'accept-ranges'].forEach(header => {
         if (upstreamRes.headers[header]) res.setHeader(header, upstreamRes.headers[header]);
       });
-
+      const baseUrl = upstreamRes.url || target.href;
       if (contentType.includes('text/html') || contentType.includes('text/css')) {
         let body = '';
-        upstream.on('data', chunk => {
-          byteCount += chunk.length;
-          body += chunk.toString('utf8');
-        });
+        upstream.on('data', chunk => { byteCount += chunk.length; body += chunk.toString('utf8'); });
         upstream.on('end', async () => {
           try {
-            const output = contentType.includes('text/html') ? rewriteHtml(body, target.href) : rewriteCss(body, target.href);
+            const output = contentType.includes('text/html') ? rewriteHtml(body, baseUrl) : rewriteCss(body, baseUrl);
             res.send(output);
-          } catch {
-            res.send(body);
-          }
+          } catch { res.send(body); }
           await recordStats(target.hostname, byteCount);
         });
       } else {
@@ -296,14 +273,14 @@ app.all('/proxy', requireAuth, async (req, res) => {
         upstream.on('end', () => recordStats(target.hostname, byteCount));
       }
     });
-
     upstream.on('error', error => {
       console.error('Proxy error:', error.message);
       if (!res.headersSent) res.status(error.code === 'ETIMEDOUT' ? 504 : 502).send(error.code === 'ETIMEDOUT' ? 'The approved website timed out while responding.' : 'Upstream connection error');
+      else if (!res.writableEnded) res.end();
     });
   } catch (error) {
     console.error('Proxy error:', error.message);
-    res.status(500).send('Proxy server error');
+    if (!res.headersSent) res.status(500).send('Proxy server error');
   }
 });
 
