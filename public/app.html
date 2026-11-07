@@ -6,16 +6,21 @@
   <title>Private Proxy</title>
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/tabs.css">
+  <link rel="stylesheet" href="/static/background-upload.css">
 </head>
 <body>
   <header class="topbar">
     <div class="container topbar-inner">
       <a class="brand" href="/">Private Proxy</a>
       <nav class="actions" aria-label="Main navigation">
+        <button id="chooseBackground" class="secondary background-button" type="button">Upload background</button>
+        <button id="resetBackground" class="secondary background-button" type="button" hidden>Reset background</button>
+        <input id="backgroundFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
         <a href="/admin" class="link">Admin</a>
         <a href="/logout" class="link">Log out</a>
       </nav>
     </div>
+    <p id="backgroundStatus" class="background-status" aria-live="polite" role="status"></p>
   </header>
 
   <main class="container page">
@@ -78,6 +83,7 @@
   </main>
 
   <script src="/static/app.js"></script>
+  <script src="/static/background.js"></script>
   <script>
     document.getElementById('clearCookies').addEventListener('click', async () => {
       const response = await fetch('/api/clear-cookies', { method: 'POST' });

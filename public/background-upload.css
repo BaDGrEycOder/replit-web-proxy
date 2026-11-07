@@ -1,0 +1,9 @@
+.background-button { padding: 9px 12px; font-size: 13px; }
+.background-button[hidden] { display: none; }
+.background-status { position: absolute; right: 20px; top: 100%; margin: 4px 0 0; padding: 0 12px; color: #fff; font-size: 12px; text-shadow: 0 1px 3px rgba(0,0,0,.7); }
+body.has-user-background { background-image: linear-gradient(rgba(7, 24, 17, .30), rgba(7, 24, 17, .46)), var(--user-background); }
+@media (max-width: 760px) {
+  .topbar-inner { flex-wrap: wrap; gap: 12px; }
+  .actions { gap: 10px; }
+  .background-status { position: static; padding: 0 14px 8px; }
+}
