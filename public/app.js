@@ -6,6 +6,7 @@
   const viewer = document.getElementById('viewer');
   const resultViewer = document.getElementById('resultViewer');
   const openNew = document.getElementById('openNew');
+  const openDirect = document.getElementById('openDirect');
   const searchForm = document.getElementById('searchForm');
   const searchInput = document.getElementById('searchInput');
   const searchStatus = document.getElementById('searchStatus');
@@ -19,10 +20,15 @@
   const frameTimers = new WeakMap();
   const LOAD_TIMEOUT_MS = 30000;
 
-  function loadInFrame(frame, url, host, label) {
+  function loadInFrame(frame, url, targetUrl, host, label) {
     clearTimeout(frameTimers.get(frame));
     let completed = false;
     notice.textContent = 'Loading ' + label + host + '…';
+    if (frame === viewer) {
+      openNew.dataset.url = url;
+      openDirect.dataset.url = targetUrl;
+      openDirect.hidden = true;
+    }
     frame.addEventListener('load', function onLoad() {
       if (completed) return;
       completed = true;
@@ -34,6 +40,8 @@
       if (completed) return;
       completed = true;
       notice.textContent = label + host + ' has not responded after 30 seconds. It may be temporarily unavailable or block proxy access.';
+      openDirect.dataset.url = targetUrl;
+      openDirect.hidden = false;
     }, LOAD_TIMEOUT_MS));
     frame.src = url;
   }
@@ -113,7 +121,7 @@
       if (!response.ok) throw new Error('Could not load the configured allowlist.');
       const list = await response.json();
       if (!Array.isArray(list)) throw new Error('The configured allowlist is invalid.');
-      ALLOW_HOSTS = [...new Set(list.map(host => String(host).trim().toLowerCase()).filter(host => /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host)))];
+      ALLOW_HOSTS = [...new Set(list.map(host => String(host).trim().toLowerCase()).filter(host => host !== 'amazon.com' && /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host)))];
       allowedList.textContent = ALLOW_HOSTS.length ? ALLOW_HOSTS.join(', ') : 'No hosts configured';
       renderApprovedApps();
     } catch (error) {
@@ -138,9 +146,7 @@
       browseStatus.textContent = 'That site is not on the configured allowlist. Ask the administrator to add ' + host + '.';
       return false;
     }
-    const proxied = proxyUrl(normalized);
-    loadInFrame(viewer, proxied, host, '');
-    openNew.dataset.url = proxied;
+    loadInFrame(viewer, proxyUrl(normalized), normalized, host, '');
     browseStatus.textContent = '';
     switchTab('browse');
     return true;
@@ -157,6 +163,14 @@
       return;
     }
     window.open(this.dataset.url, '_blank', 'noopener,noreferrer');
+  });
+  openDirect.addEventListener('click', function () {
+    const url = this.dataset.url;
+    if (!url || !isAllowed(url)) {
+      browseStatus.textContent = 'Choose an approved website first.';
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
   });
 
   searchForm.addEventListener('submit', async function (event) {
@@ -192,7 +206,7 @@
             return;
           }
           const host = new URL(normalized).hostname;
-          loadInFrame(resultViewer, proxyUrl(normalized), host, 'Search result: ');
+          loadInFrame(resultViewer, proxyUrl(normalized), normalized, host, 'Search result: ');
           switchTab('result');
         });
         const description = document.createElement('p');

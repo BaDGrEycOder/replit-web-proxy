@@ -33,12 +33,18 @@ const ALLOW_FILE = path.join(DATA_DIR, 'allowlist.json');
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
 if (!fsSync.existsSync(DATA_DIR)) fsSync.mkdirSync(DATA_DIR, { recursive: true });
 
+const DEFAULT_ALLOW_HOSTS = ['spotify.com', 'youtube.com', 'yahoo.com', 'mail.yahoo.com'];
 async function loadAllowlist() {
-  try { return JSON.parse(await fs.readFile(ALLOW_FILE, 'utf8')); }
-  catch {
-    const defaults = ['spotify.com', 'youtube.com', 'yahoo.com', 'mail.yahoo.com', 'amazon.com'];
-    await fs.writeFile(ALLOW_FILE, JSON.stringify(defaults, null, 2));
-    return defaults;
+  try {
+    const stored = JSON.parse(await fs.readFile(ALLOW_FILE, 'utf8'));
+    if (!Array.isArray(stored)) throw new Error('Invalid allowlist');
+    // Remove the known non-working Amazon entry from existing deployments too.
+    const cleaned = [...new Set(stored.map(host => String(host).trim().toLowerCase()).filter(host => host && host !== 'amazon.com'))];
+    if (JSON.stringify(cleaned) !== JSON.stringify(stored)) await fs.writeFile(ALLOW_FILE, JSON.stringify(cleaned, null, 2));
+    return cleaned;
+  } catch {
+    await fs.writeFile(ALLOW_FILE, JSON.stringify(DEFAULT_ALLOW_HOSTS, null, 2));
+    return DEFAULT_ALLOW_HOSTS;
   }
 }
 async function saveAllowlist(list) {
@@ -93,13 +99,11 @@ app.get('/login', (req, res) => {
   req.session.isAdmin = false;
   res.redirect('/');
 });
-
 app.post('/login', (req, res) => {
   req.session.authenticated = true;
   req.session.isAdmin = false;
   return res.redirect('/');
 });
-
 app.get('/logout', (req, res) => { req.session = null; res.redirect('/login'); });
 app.get('/', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'app.html')));
 app.get('/admin', requireAdmin, (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
@@ -107,7 +111,7 @@ app.get('/admin', requireAdmin, (req, res) => res.sendFile(path.join(__dirname, 
 app.get('/api/admin/allowlist', requireAdmin, (req, res) => res.json(ALLOW_HOSTS));
 app.post('/api/admin/allowlist', requireAdmin, async (req, res) => {
   if (!Array.isArray(req.body.list)) return res.status(400).send('Invalid list');
-  const list = req.body.list.map(value => String(value).trim().toLowerCase()).filter(Boolean);
+  const list = req.body.list.map(value => String(value).trim().toLowerCase()).filter(host => host && host !== 'amazon.com');
   if (list.some(host => !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(host))) {
     return res.status(400).send('Enter hostnames only, such as example.com');
   }
@@ -173,6 +177,50 @@ app.post('/api/clear-cookies', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+function proxyPath(url) {
+  return '/proxy?url=' + encodeURIComponent(url.href);
+}
+function rewriteCss(css, baseUrl) {
+  return css.replace(/url\(\s*(['"]?)(.*?)\1\s*\)/gi, (whole, quote, value) => {
+    const trimmed = value.trim();
+    if (!trimmed || /^(?:data:|blob:|#|javascript:)/i.test(trimmed)) return whole;
+    try {
+      const resolved = new URL(trimmed, baseUrl);
+      if (!['http:', 'https:'].includes(resolved.protocol) || !isAllowedHost(resolved.hostname)) return whole;
+      return `url(${quote}${proxyPath(resolved)}${quote})`;
+    } catch { return whole; }
+  });
+}
+function rewriteHtml(html, baseUrl) {
+  const $ = cheerio.load(html);
+  const proxify = value => {
+    try {
+      const resolved = new URL(value, baseUrl);
+      if (!['http:', 'https:'].includes(resolved.protocol) || !isAllowedHost(resolved.hostname)) return value;
+      return proxyPath(resolved);
+    } catch { return value; }
+  };
+  $('a[href], area[href], link[href], script[src], img[src], iframe[src], source[src], video[src], audio[src], form[action], input[src], video[poster]').each((_, element) => {
+    const tag = element.tagName.toLowerCase();
+    const attr = tag === 'form' ? 'action' : (element.attribs.action !== undefined ? 'action' : (element.attribs.poster !== undefined ? 'poster' : (element.attribs.href !== undefined ? 'href' : 'src')));
+    const value = $(element).attr(attr);
+    if (value) $(element).attr(attr, proxify(value));
+  });
+  $('[srcset]').each((_, element) => {
+    const value = $(element).attr('srcset');
+    const updated = value.split(',').map(candidate => {
+      const parts = candidate.trim().split(/\s+/);
+      if (parts[0]) parts[0] = proxify(parts[0]);
+      return parts.join(' ');
+    }).join(', ');
+    $(element).attr('srcset', updated);
+  });
+  $('style').each((_, element) => $(element).text(rewriteCss($(element).text(), baseUrl)));
+  $('[style]').each((_, element) => $(element).attr('style', rewriteCss($(element).attr('style'), baseUrl)));
+  $('body').prepend('<div style="position:fixed;left:0;right:0;top:0;background:#ffffffaa;backdrop-filter:blur(6px);border-bottom:1px solid #ddd;padding:6px;font-size:13px;z-index:9999;">Proxied via private web proxy</div><div style="height:36px;"></div>');
+  return $.html();
+}
+
 app.all('/proxy', requireAuth, async (req, res) => {
   const rawUrl = req.query.url || req.body.url;
   if (!rawUrl) return res.status(400).send('Missing url parameter');
@@ -183,39 +231,45 @@ app.all('/proxy', requireAuth, async (req, res) => {
   if (!isAllowedHost(target.hostname)) return res.status(403).send('Host not allowed by proxy policy');
 
   try {
-    const headers = { ...req.headers };
-    delete headers.host;
-    delete headers['content-length'];
+    // Only send normal browser negotiation headers upstream. Never forward the app's
+    // session cookie, host, or proxy authorization headers to a destination site.
+    const headers = {
+      'user-agent': req.get('user-agent') || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36',
+      accept: req.get('accept') || '*/*',
+      'accept-language': req.get('accept-language') || 'en-US,en;q=0.9'
+    };
+    if (req.get('content-type')) headers['content-type'] = req.get('content-type');
+    if (req.get('range')) headers.range = req.get('range');
     const upstream = got.stream(target.href, {
       method: req.method,
       headers,
       throwHttpErrors: false,
       cookieJar: getJarForSession(req),
+      timeout: { request: 45000, response: 20000, socket: 30000 },
       ...(req.method !== 'GET' && req.method !== 'HEAD' ? { body: req } : {})
     });
     let byteCount = 0;
     upstream.on('response', upstreamRes => {
       res.status(upstreamRes.statusCode);
       const contentType = upstreamRes.headers['content-type'] || '';
-      ['content-type', 'cache-control', 'last-modified', 'etag'].forEach(header => {
+      ['content-type', 'cache-control', 'last-modified', 'etag', 'content-range', 'accept-ranges'].forEach(header => {
         if (upstreamRes.headers[header]) res.setHeader(header, upstreamRes.headers[header]);
       });
-      if (contentType.includes('text/html')) {
-        let html = '';
-        upstream.on('data', chunk => { html += chunk.toString('utf8'); byteCount += chunk.length; });
+      const baseUrl = upstreamRes.url || target.href;
+      if (contentType.includes('text/html') || contentType.includes('text/css')) {
+        let body = '';
+        let tooLarge = false;
+        upstream.on('data', chunk => {
+          byteCount += chunk.length;
+          if (byteCount > 8 * 1024 * 1024) { tooLarge = true; upstream.destroy(new Error('Upstream document exceeds proxy limit')); return; }
+          body += chunk.toString('utf8');
+        });
         upstream.on('end', async () => {
+          if (tooLarge) return;
           try {
-            const $ = cheerio.load(html);
-            $('a[href], link[href], script[src], img[src], form[action]').each((_, element) => {
-              const attr = element.tagName === 'form' ? 'action' : (element.attribs.href ? 'href' : 'src');
-              const value = $(element).attr(attr);
-              if (!value) return;
-              try { $(element).attr(attr, '/proxy?url=' + encodeURIComponent(new URL(value, target.href).href)); }
-              catch { /* Leave invalid/relative special values untouched. */ }
-            });
-            $('body').prepend('<div style="position:fixed;left:0;right:0;top:0;background:#ffffffaa;backdrop-filter:blur(6px);border-bottom:1px solid #ddd;padding:6px;font-size:13px;z-index:9999;">Proxied via private web proxy</div><div style="height:36px;"></div>');
-            res.send($.html());
-          } catch { res.send(html); }
+            const output = contentType.includes('text/html') ? rewriteHtml(body, baseUrl) : rewriteCss(body, baseUrl);
+            res.send(output);
+          } catch { res.send(body); }
           await recordStats(target.hostname, byteCount);
         });
       } else {
@@ -226,11 +280,12 @@ app.all('/proxy', requireAuth, async (req, res) => {
     });
     upstream.on('error', error => {
       console.error('Proxy error:', error.message);
-      if (!res.headersSent) res.status(502).send('Upstream connection error');
+      if (!res.headersSent) res.status(error.code === 'ETIMEDOUT' ? 504 : 502).send(error.code === 'ETIMEDOUT' ? 'The approved website timed out while responding.' : 'Upstream connection error');
+      else if (!res.writableEnded) res.end();
     });
   } catch (error) {
     console.error('Proxy error:', error.message);
-    res.status(500).send('Proxy server error');
+    if (!res.headersSent) res.status(500).send('Proxy server error');
   }
 });
 
