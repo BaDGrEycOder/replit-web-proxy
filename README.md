@@ -1,4 +1,4 @@
-# Replit Web Proxy (Private) - NO AI
+# Replit Web Proxy (Private)
 
 This repository contains a simple, private web-based HTTP proxy prepared for hosting (Render, Replit, etc.). AI/Copilot features have been removed in this version.
 
