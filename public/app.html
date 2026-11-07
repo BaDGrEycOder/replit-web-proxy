@@ -8,50 +8,66 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="container">
-      <div class="brand">Private Proxy</div>
-      <div class="actions">
-        <a href="/logout" class="link">Log out</a>
+    <div class="container topbar-inner">
+      <a class="brand" href="/">Private Proxy</a>
+      <nav class="actions" aria-label="Main navigation">
         <a href="/admin" class="link">Admin</a>
-      </div>
+        <a href="/logout" class="link">Log out</a>
+      </nav>
     </div>
   </header>
 
   <main class="container page">
-    <section class="panel">
-      <h2>Search the internet</h2>
-      <p class="muted">Search with DuckDuckGo. Results open in a new tab and are not routed through the proxy.</p>
-      <form class="row" action="https://duckduckgo.com/" method="GET" target="_blank" rel="noopener noreferrer">
-        <input name="q" type="search" placeholder="What would you like to find?" aria-label="Search the internet" required>
-        <button type="submit" class="primary">Search</button>
-      </form>
-    </section>
+    <section class="home-grid" aria-label="Search and browse">
+      <section class="panel search-panel">
+        <div class="section-heading">
+          <span class="eyebrow">DISCOVER</span>
+          <h1>Search the internet</h1>
+          <p class="muted">Private-search dashboard, powered by DuckDuckGo.</p>
+        </div>
+        <form id="searchForm" class="search-form">
+          <input id="searchInput" name="q" type="search" placeholder="What are you looking for?" aria-label="Search the internet" required>
+          <button type="submit" class="primary">Search</button>
+        </form>
+        <p id="searchStatus" class="muted status" aria-live="polite">Your results will appear here.</p>
+        <div id="searchResults" class="search-results" aria-live="polite"></div>
+      </section>
 
-    <section class="panel">
-      <h2>Browse an allowed site</h2>
-      <form id="proxyForm" class="row" onsubmit="return goProxy()">
-        <input id="urlInput" placeholder="https://youtube.com" autocomplete="off">
-        <button type="submit" class="primary">Go</button>
-        <button id="openNew" type="button" class="secondary">Open in new tab</button>
-      </form>
-      <p class="muted">Allowed hosts: <span id="allowedList"></span></p>
-      <div style="margin-top:8px">
-        <button id="clearCookies" class="secondary">Clear cookies for this session</button>
-      </div>
+      <section class="panel browse-panel">
+        <div class="section-heading">
+          <span class="eyebrow">BROWSE</span>
+          <h2>Open an allowed site</h2>
+          <p class="muted">Enter a URL from your configured allowlist.</p>
+        </div>
+        <form id="proxyForm" class="browse-form" onsubmit="return goProxy()">
+          <input id="urlInput" placeholder="https://youtube.com" autocomplete="url" aria-label="Website URL">
+          <div class="button-row">
+            <button type="submit" class="primary">Browse site</button>
+            <button id="openNew" type="button" class="secondary">Open in new tab</button>
+          </div>
+        </form>
+        <p class="muted allowed-label">Allowed hosts: <span id="allowedList"></span></p>
+        <button id="clearCookies" class="quiet-button" type="button">Clear this session’s site cookies</button>
+      </section>
     </section>
 
     <section class="panel preview">
-      <div id="notice" class="muted">Proxied pages appear below. If a site does not display here, use “Open in new tab”.</div>
-      <iframe id="viewer" sandbox="allow-forms allow-scripts allow-same-origin" srcdoc="" title="Proxy viewer"></iframe>
+      <div class="preview-heading">
+        <div>
+          <span class="eyebrow">BROWSER</span>
+          <h2>Browsing window</h2>
+        </div>
+        <p id="notice" class="muted">Choose a site above to show it here.</p>
+      </div>
+      <iframe id="viewer" sandbox="allow-forms allow-scripts allow-same-origin" srcdoc="" title="Proxied website"></iframe>
     </section>
-
   </main>
 
   <script src="/static/app.js"></script>
   <script>
-    document.getElementById('clearCookies').addEventListener('click', async ()=>{
-      const r = await fetch('/api/clear-cookies', {method:'POST'});
-      if (r.ok) alert('Cookies cleared for this session'); else alert('Error clearing cookies');
+    document.getElementById('clearCookies').addEventListener('click', async () => {
+      const response = await fetch('/api/clear-cookies', { method: 'POST' });
+      alert(response.ok ? 'Site cookies cleared for this session.' : 'Could not clear cookies. Please try again.');
     });
   </script>
 </body>

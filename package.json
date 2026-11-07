@@ -1,17 +1,16 @@
 {
   "name": "replit-web-proxy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "scripts": { "start": "node server.js" },
   "dependencies": {
     "cheerio": "^1.0.0-rc.12",
     "cookie-session": "^2.0.0",
     "express": "^4.18.2",
     "express-rate-limit": "^6.8.0",
-    "got": "^12.0.0",
+    "got": "^11.8.6",
     "helmet": "^7.0.0",
     "tough-cookie": "^4.1.0"
-  }
+  },
+  "engines": { "node": ">=18" }
 }
