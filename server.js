@@ -77,26 +77,29 @@ function getJarForSession(req) {
 }
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) return next();
-  res.redirect('/login');
+  req.session.authenticated = true;
+  req.session.isAdmin = false;
+  return next();
 }
 function requireAdmin(req, res, next) {
   if (req.session && req.session.isAdmin) return next();
-  res.redirect('/login?admin=1');
+  req.session.authenticated = true;
+  req.session.isAdmin = false;
+  return next();
 }
 
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.post('/login', (req, res) => {
-  const password = (req.body.password || '').toString();
-  const userPassword = process.env.PROXY_PASSWORD || '';
-  const adminPassword = process.env.ADMIN_PASSWORD || '';
-  if (!userPassword) return res.status(500).send('PROXY_PASSWORD not set in environment/secrets');
-  if (password === userPassword || (adminPassword && password === adminPassword)) {
-    req.session.authenticated = true;
-    req.session.isAdmin = Boolean(adminPassword && password === adminPassword);
-    return res.redirect('/');
-  }
-  res.status(401).send('Invalid password. <a href="/login">Try again</a>');
+app.get('/login', (req, res) => {
+  req.session.authenticated = true;
+  req.session.isAdmin = false;
+  res.redirect('/');
 });
+
+app.post('/login', (req, res) => {
+  req.session.authenticated = true;
+  req.session.isAdmin = false;
+  return res.redirect('/');
+});
+
 app.get('/logout', (req, res) => { req.session = null; res.redirect('/login'); });
 app.get('/', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'app.html')));
 app.get('/admin', requireAdmin, (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
