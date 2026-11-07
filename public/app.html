@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Private Proxy</title>
   <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/tabs.css">
 </head>
 <body>
   <header class="topbar">
@@ -46,7 +47,8 @@
             <button id="openNew" type="button" class="secondary">Open in new tab</button>
           </div>
         </form>
-        <p class="muted allowed-label">Allowed hosts: <span id="allowedList"></span></p>
+        <p class="muted allowed-label">Allowed hosts: <span id="allowedList">Loading…</span></p>
+        <p id="browseStatus" class="muted status" aria-live="polite"></p>
         <button id="clearCookies" class="quiet-button" type="button">Clear this session’s site cookies</button>
       </section>
     </section>
@@ -59,7 +61,16 @@
         </div>
         <p id="notice" class="muted">Choose a site above to show it here.</p>
       </div>
-      <iframe id="viewer" sandbox="allow-forms allow-scripts allow-same-origin" srcdoc="" title="Proxied website"></iframe>
+      <div class="browser-tabs" role="tablist" aria-label="In-app browser tabs">
+        <button id="browseTab" class="browser-tab active" type="button" role="tab" aria-selected="true" aria-controls="browsePane">Browse</button>
+        <button id="resultTab" class="browser-tab" type="button" role="tab" aria-selected="false" aria-controls="resultPane">Search result</button>
+      </div>
+      <div id="browsePane" class="browser-pane active" role="tabpanel" aria-labelledby="browseTab">
+        <iframe id="viewer" sandbox="allow-forms allow-scripts allow-same-origin" srcdoc="" title="Browsed website"></iframe>
+      </div>
+      <div id="resultPane" class="browser-pane" role="tabpanel" aria-labelledby="resultTab" hidden>
+        <iframe id="resultViewer" sandbox="allow-forms allow-scripts allow-same-origin" srcdoc="" title="Search result website"></iframe>
+      </div>
     </section>
   </main>
 
