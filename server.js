@@ -7,8 +7,6 @@ const cheerio = require('cheerio');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieSession = require('cookie-session');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const { URL } = require('url');
 const path = require('path');
 const { CookieJar } = require('tough-cookie');
@@ -25,9 +23,6 @@ app.use(cookieSession({
   maxAge: 24 * 60 * 60 * 1000
 }));
 
-app.use(passport.initialize());
-app.use(passport.session());
-
 app.use(rateLimit({
   windowMs: 60 * 1000,
   max: process.env.RATE_LIMIT_PER_MIN ? parseInt(process.env.RATE_LIMIT_PER_MIN, 10) : 60
@@ -37,49 +32,6 @@ const DATA_DIR = path.join(__dirname, 'data');
 const ALLOW_FILE = path.join(DATA_DIR, 'allowlist.json');
 const STATS_FILE = path.join(DATA_DIR, 'stats.json');
 if (!fsSync.existsSync(DATA_DIR)) fsSync.mkdirSync(DATA_DIR, { recursive: true });
-
-function splitCsv(value) {
-  return String(value || '')
-    .split(',')
-    .map(item => item.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function isGoogleConfigured() {
-  return Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
-}
-
-function isAllowedGoogleEmail(email) {
-  const allowed = splitCsv(process.env.GOOGLE_ALLOWED_EMAILS || '');
-  if (!allowed.length) return true;
-  return allowed.includes(String(email || '').toLowerCase());
-}
-
-function isGoogleAdminEmail(email) {
-  const admins = splitCsv(process.env.GOOGLE_ADMIN_EMAILS || '');
-  return admins.includes(String(email || '').toLowerCase());
-}
-
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID || '',
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-  callbackURL: process.env.GOOGLE_CALLBACK_URL || '/auth/google/callback',
-  passReqToCallback: true
-}, (req, accessToken, refreshToken, profile, done) => {
-  const email = (profile.emails && profile.emails[0] && profile.emails[0].value || '').toLowerCase();
-  if (!isAllowedGoogleEmail(email)) {
-    return done(null, false, { message: 'This Google account is not allowed to access this app.' });
-  }
-  return done(null, {
-    id: profile.id,
-    email,
-    name: profile.displayName,
-    picture: profile.photos && profile.photos[0] ? profile.photos[0].value : null
-  });
-}));
-
-passport.serializeUser((user, done) => done(null, user.email || user.id));
-passport.deserializeUser((id, done) => done(null, { id }));
 
 async function loadAllowlist() {
   try { return JSON.parse(await fs.readFile(ALLOW_FILE, 'utf8')); }
@@ -125,68 +77,29 @@ function getJarForSession(req) {
 }
 function requireAuth(req, res, next) {
   if (req.session && req.session.authenticated) return next();
-  if (req.user) return next();
   res.redirect('/login');
 }
 function requireAdmin(req, res, next) {
-  const sessionAdmin = req.session && req.session.isAdmin;
-  const userEmail = req.user && req.user.email ? req.user.email.toLowerCase() : null;
-  if (sessionAdmin || (userEmail && isGoogleAdminEmail(userEmail))) return next();
+  if (req.session && req.session.isAdmin) return next();
   res.redirect('/login?admin=1');
 }
 
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'login.html'));
-});
-
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.post('/login', (req, res) => {
-  const pwd = (req.body.password || '').toString();
-  const expected = process.env.PROXY_PASSWORD || '';
-  const adminPwd = process.env.ADMIN_PASSWORD || '';
-  if (!expected) return res.status(500).send('PROXY_PASSWORD not set in environment/secrets');
-  if (pwd === expected) {
+  const password = (req.body.password || '').toString();
+  const userPassword = process.env.PROXY_PASSWORD || '';
+  const adminPassword = process.env.ADMIN_PASSWORD || '';
+  if (!userPassword) return res.status(500).send('PROXY_PASSWORD not set in environment/secrets');
+  if (password === userPassword || (adminPassword && password === adminPassword)) {
     req.session.authenticated = true;
-    req.session.isAdmin = Boolean(adminPwd && pwd === adminPwd);
+    req.session.isAdmin = Boolean(adminPassword && password === adminPassword);
     return res.redirect('/');
   }
   res.status(401).send('Invalid password. <a href="/login">Try again</a>');
 });
-
-app.get('/auth/google', (req, res, next) => {
-  if (!isGoogleConfigured()) {
-    return res.redirect('/login?google=missing');
-  }
-  passport.authenticate('google', { scope: ['profile', 'email'], prompt: 'select_account' })(req, res, next);
-});
-
-app.get('/auth/google/callback', (req, res, next) => {
-  passport.authenticate('google', { failureRedirect: '/login?google=fail', session: true }, (err, user, info) => {
-    if (err || !user) {
-      return res.redirect('/login?google=fail');
-    }
-    req.session.authenticated = true;
-    req.session.isAdmin = isGoogleAdminEmail(user.email || '');
-    req.session.user = user;
-    req.logIn(user, loginErr => {
-      if (loginErr) return next(loginErr);
-      return res.redirect('/');
-    });
-  })(req, res, next);
-});
-
-app.get('/logout', (req, res) => {
-  req.logout?.(() => {});
-  req.session = null;
-  res.redirect('/login');
-});
-
-app.get('/', requireAuth, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'app.html'));
-});
-
-app.get('/admin', requireAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
+app.get('/logout', (req, res) => { req.session = null; res.redirect('/login'); });
+app.get('/', requireAuth, (req, res) => res.sendFile(path.join(__dirname, 'public', 'app.html')));
+app.get('/admin', requireAdmin, (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
 
 app.get('/api/admin/allowlist', requireAdmin, (req, res) => res.json(ALLOW_HOSTS));
 app.post('/api/admin/allowlist', requireAdmin, async (req, res) => {
@@ -222,7 +135,6 @@ function fetchDuckDuckGo(query) {
     request.on('error', reject);
   });
 }
-
 app.get('/api/search', requireAuth, async (req, res) => {
   const query = String(req.query.q || '').trim().slice(0, 200);
   if (query.length < 2) return res.status(400).json({ error: 'Enter at least 2 characters to search.' });
@@ -244,9 +156,7 @@ app.get('/api/search', requireAuth, async (req, res) => {
         const safeUrl = new URL(href);
         if (!['http:', 'https:'].includes(safeUrl.protocol)) return;
         results.push({ title, snippet, url: safeUrl.href });
-      } catch {
-        // Skip malformed search result links.
-      }
+      } catch { /* Skip malformed search result links. */ }
     });
     res.json({ results });
   } catch (error) {
@@ -298,13 +208,11 @@ app.all('/proxy', requireAuth, async (req, res) => {
               const value = $(element).attr(attr);
               if (!value) return;
               try { $(element).attr(attr, '/proxy?url=' + encodeURIComponent(new URL(value, target.href).href)); }
-              catch { /* skip invalid values */ }
+              catch { /* Leave invalid/relative special values untouched. */ }
             });
             $('body').prepend('<div style="position:fixed;left:0;right:0;top:0;background:#ffffffaa;backdrop-filter:blur(6px);border-bottom:1px solid #ddd;padding:6px;font-size:13px;z-index:9999;">Proxied via private web proxy</div><div style="height:36px;"></div>');
             res.send($.html());
-          } catch {
-            res.send(html);
-          }
+          } catch { res.send(html); }
           await recordStats(target.hostname, byteCount);
         });
       } else {
