@@ -1,5 +1,6 @@
 (function () {
   let ALLOW_HOSTS = [];
+  const DEFAULT_HOSTS = ['spotify.com', 'youtube.com', 'yahoo.com', 'mail.yahoo.com'];
   const allowedList = document.getElementById('allowedList');
   const approvedApps = document.getElementById('approvedApps');
   const urlInput = document.getElementById('urlInput');
@@ -26,8 +27,10 @@
     notice.textContent = 'Loading ' + label + host + '…';
     if (frame === viewer) {
       openNew.dataset.url = url;
-      openDirect.dataset.url = targetUrl;
-      openDirect.hidden = true;
+      if (openDirect) {
+        openDirect.dataset.url = targetUrl;
+        openDirect.hidden = true;
+      }
     }
     frame.addEventListener('load', function onLoad() {
       if (completed) return;
@@ -40,8 +43,10 @@
       if (completed) return;
       completed = true;
       notice.textContent = label + host + ' has not responded after 30 seconds. It may be temporarily unavailable or block proxy access.';
-      openDirect.dataset.url = targetUrl;
-      openDirect.hidden = false;
+      if (openDirect && frame === viewer) {
+        openDirect.dataset.url = targetUrl;
+        openDirect.hidden = false;
+      }
     }, LOAD_TIMEOUT_MS));
     frame.src = url;
   }
@@ -84,7 +89,6 @@
       'mail.yahoo.com': 'Yahoo Mail',
       'youtube.com': 'YouTube',
       'spotify.com': 'Spotify',
-      'amazon.com': 'Amazon',
       'yahoo.com': 'Yahoo'
     };
     if (knownLabels[host]) return knownLabels[host];
@@ -125,13 +129,12 @@
       allowedList.textContent = ALLOW_HOSTS.length ? ALLOW_HOSTS.join(', ') : 'No hosts configured';
       renderApprovedApps();
     } catch (error) {
-      allowedList.textContent = 'Could not load allowlist';
-      approvedApps.textContent = '';
-      const message = document.createElement('p');
-      message.className = 'muted small';
-      message.textContent = error.message;
-      approvedApps.append(message);
-      browseStatus.textContent = error.message;
+      // Keep the main approved-site shortcuts usable if the admin-only allowlist
+      // endpoint is unavailable to a regular browsing session.
+      ALLOW_HOSTS = DEFAULT_HOSTS.slice();
+      allowedList.textContent = ALLOW_HOSTS.join(', ') + ' (default list)';
+      renderApprovedApps();
+      browseStatus.textContent = 'Could not load the saved allowlist; showing the default approved sites.';
     }
   }
 
@@ -164,14 +167,16 @@
     }
     window.open(this.dataset.url, '_blank', 'noopener,noreferrer');
   });
-  openDirect.addEventListener('click', function () {
-    const url = this.dataset.url;
-    if (!url || !isAllowed(url)) {
-      browseStatus.textContent = 'Choose an approved website first.';
-      return;
-    }
-    window.open(url, '_blank', 'noopener,noreferrer');
-  });
+  if (openDirect) {
+    openDirect.addEventListener('click', function () {
+      const url = this.dataset.url;
+      if (!url || !isAllowed(url)) {
+        browseStatus.textContent = 'Choose an approved website first.';
+        return;
+      }
+      window.open(url, '_blank', 'noopener,noreferrer');
+    });
+  }
 
   searchForm.addEventListener('submit', async function (event) {
     event.preventDefault();
