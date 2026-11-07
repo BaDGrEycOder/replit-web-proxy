@@ -10,6 +10,8 @@
     "express-rate-limit": "^6.8.0",
     "got": "^11.8.6",
     "helmet": "^7.0.0",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "tough-cookie": "^4.1.0"
   },
   "engines": { "node": ">=18" }
