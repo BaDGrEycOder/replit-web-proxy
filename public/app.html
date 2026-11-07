@@ -7,12 +7,14 @@
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/tabs.css">
   <link rel="stylesheet" href="/static/background-upload.css">
+  <link rel="stylesheet" href="/static/dark-mode.css">
 </head>
 <body>
   <header class="topbar">
     <div class="container topbar-inner">
       <a class="brand" href="/">Private Proxy</a>
       <nav class="actions" aria-label="Main navigation">
+        <button id="themeToggle" class="secondary background-button" type="button" aria-pressed="false">🌙 Dark mode</button>
         <button id="chooseBackground" class="secondary background-button" type="button">Upload background</button>
         <button id="resetBackground" class="secondary background-button" type="button" hidden>Reset background</button>
         <input id="backgroundFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
@@ -84,6 +86,7 @@
 
   <script src="/static/app.js"></script>
   <script src="/static/background.js"></script>
+  <script src="/static/dark-mode.js"></script>
   <script>
     document.getElementById('clearCookies').addEventListener('click', async () => {
       const response = await fetch('/api/clear-cookies', { method: 'POST' });

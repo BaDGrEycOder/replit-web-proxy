@@ -1,0 +1,46 @@
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #edf2f7;
+  --muted: #c0cad6;
+  --accent: #c4b8ff;
+  --accent-dark: #e0d9ff;
+  --glass: rgba(15, 23, 32, .72);
+  --glass-border: rgba(225, 235, 245, .22);
+  --shadow: 0 18px 50px rgba(0, 0, 0, .28);
+}
+:root[data-theme="dark"] .topbar {
+  background: rgba(12, 19, 27, .72);
+  border-bottom-color: rgba(225, 235, 245, .18);
+}
+:root[data-theme="dark"] .brand,
+:root[data-theme="dark"] .link { color: #e5e9ff; }
+:root[data-theme="dark"] .panel {
+  background: rgba(15, 23, 32, .72);
+  border-color: rgba(225, 235, 245, .22);
+}
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] textarea {
+  color: var(--ink);
+  background: rgba(7, 13, 20, .72);
+  border-color: rgba(225, 235, 245, .24);
+}
+:root[data-theme="dark"] input::placeholder { color: #a7b2c0; }
+:root[data-theme="dark"] .secondary,
+:root[data-theme="dark"] .app-shortcut {
+  color: #eef0ff;
+  background: rgba(35, 44, 58, .82);
+  border-color: rgba(225, 235, 245, .22);
+}
+:root[data-theme="dark"] .result-card {
+  background: rgba(21, 31, 42, .76);
+  border-color: rgba(225, 235, 245, .18);
+}
+:root[data-theme="dark"] .result-title { color: #c8bdff; }
+:root[data-theme="dark"] .result-source { color: #70d9b3; }
+:root[data-theme="dark"] .browser-tab { color: #c0cad6; }
+:root[data-theme="dark"] .browser-tab.active { color: #e1d9ff; background: rgba(35, 44, 58, .82); }
+:root[data-theme="dark"] #viewer,
+:root[data-theme="dark"] .browser-pane iframe { border-color: rgba(225, 235, 245, .24); }
+:root[data-theme="dark"] .quiet-button { color: #c4b8ff; }
+:root[data-theme="dark"] .eyebrow { color: #c4b8ff; }
+:root[data-theme="dark"] .background-status { color: #fff; }
