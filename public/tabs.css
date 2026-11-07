@@ -5,3 +5,6 @@
 .browser-pane[hidden] { display: none; }
 .browser-pane iframe { width: 100%; height: 100%; min-height: 250px; border: 1px solid rgba(255,255,255,.86); border-radius: 0 0 15px 15px; background: rgba(255,255,255,.78); }
 .preview { min-height: 540px; }
+.approved-apps { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.app-shortcut { color: #373253; background: rgba(255,255,255,.78); border-color: rgba(85,70,215,.18); }
+.app-shortcut:hover { color: var(--accent-dark); border-color: rgba(85,70,215,.45); }

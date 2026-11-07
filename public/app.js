@@ -1,6 +1,7 @@
 (function () {
   let ALLOW_HOSTS = [];
   const allowedList = document.getElementById('allowedList');
+  const approvedApps = document.getElementById('approvedApps');
   const urlInput = document.getElementById('urlInput');
   const viewer = document.getElementById('viewer');
   const resultViewer = document.getElementById('resultViewer');
@@ -49,23 +50,64 @@
     return '/proxy?url=' + encodeURIComponent(url);
   }
 
+  function appLabel(host) {
+    const knownLabels = {
+      'mail.yahoo.com': 'Yahoo Mail',
+      'youtube.com': 'YouTube',
+      'spotify.com': 'Spotify',
+      'amazon.com': 'Amazon',
+      'yahoo.com': 'Yahoo'
+    };
+    if (knownLabels[host]) return knownLabels[host];
+    return host.split('.')[0].replace(/[-_]+/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+  }
+
+  function renderApprovedApps() {
+    approvedApps.replaceChildren();
+    if (!ALLOW_HOSTS.length) {
+      const empty = document.createElement('p');
+      empty.className = 'muted small';
+      empty.textContent = 'No approved apps are configured yet.';
+      approvedApps.append(empty);
+      return;
+    }
+    ALLOW_HOSTS.forEach(host => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'app-shortcut';
+      button.textContent = appLabel(host);
+      button.setAttribute('aria-label', 'Open ' + appLabel(host));
+      button.addEventListener('click', () => {
+        const url = 'https://' + host;
+        urlInput.value = url;
+        browseTo(url);
+      });
+      approvedApps.append(button);
+    });
+  }
+
   async function loadAllowlist() {
     try {
       const response = await fetch('/api/admin/allowlist');
       if (!response.ok) throw new Error('Could not load the configured allowlist.');
       const list = await response.json();
       if (!Array.isArray(list)) throw new Error('The configured allowlist is invalid.');
-      ALLOW_HOSTS = list.map(host => String(host).trim().toLowerCase()).filter(Boolean);
+      ALLOW_HOSTS = [...new Set(list.map(host => String(host).trim().toLowerCase()).filter(host => /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host)))];
       allowedList.textContent = ALLOW_HOSTS.length ? ALLOW_HOSTS.join(', ') : 'No hosts configured';
+      renderApprovedApps();
     } catch (error) {
       allowedList.textContent = 'Could not load allowlist';
+      approvedApps.textContent = '';
+      const message = document.createElement('p');
+      message.className = 'muted small';
+      message.textContent = error.message;
+      approvedApps.append(message);
       browseStatus.textContent = error.message;
     }
   }
-  loadAllowlist();
 
-  window.goProxy = function () {
-    const normalized = normalize(urlInput.value);
+  function browseTo(value) {
+    const normalized = normalize(value);
     if (!normalized || !['http:', 'https:'].includes(new URL(normalized).protocol)) {
       browseStatus.textContent = 'Please enter a valid HTTP or HTTPS website address.';
       return false;
@@ -81,12 +123,17 @@
     browseStatus.textContent = '';
     notice.textContent = 'Loading ' + host + '…';
     switchTab('browse');
+    return true;
+  }
+
+  window.goProxy = function () {
+    browseTo(urlInput.value);
     return false;
   };
 
   openNew.addEventListener('click', function () {
     if (!this.dataset.url) {
-      browseStatus.textContent = 'Enter an allowed website address and choose Browse site first.';
+      browseStatus.textContent = 'Choose an approved app or enter an approved website first.';
       return;
     }
     window.open(this.dataset.url, '_blank', 'noopener,noreferrer');
@@ -141,4 +188,6 @@
       searchStatus.textContent = error.message || 'Search failed. Please try again.';
     }
   });
+
+  loadAllowlist();
 })();

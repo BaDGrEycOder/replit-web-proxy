@@ -37,8 +37,11 @@
       <section class="panel browse-panel">
         <div class="section-heading">
           <span class="eyebrow">BROWSE</span>
-          <h2>Open an allowed site</h2>
-          <p class="muted">Enter a URL from your configured allowlist.</p>
+          <h2>Open an approved site</h2>
+          <p class="muted">Choose an app button or enter an approved website address.</p>
+        </div>
+        <div id="approvedApps" class="approved-apps" aria-label="Approved apps">
+          <p class="muted small">Loading approved apps…</p>
         </div>
         <form id="proxyForm" class="browse-form" onsubmit="return goProxy()">
           <input id="urlInput" placeholder="https://youtube.com" autocomplete="url" aria-label="Website URL">
