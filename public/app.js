@@ -33,7 +33,7 @@
     frameTimers.set(frame, setTimeout(() => {
       if (completed) return;
       completed = true;
-      notice.textContent = label + host + ' has not responded after 30 seconds. It may be temporarily unavailable or block proxy access.';
+      notice.textContent = label + host + ' has not responded after 30 seconds. It may be temporarily unavailable or block proxy access. Use “Open site directly in new tab” to visit it outside the proxy.';
     }, LOAD_TIMEOUT_MS));
     frame.src = url;
   }
@@ -140,7 +140,7 @@
     }
     const proxied = proxyUrl(normalized);
     loadInFrame(viewer, proxied, host, '');
-    openNew.dataset.url = proxied;
+    openNew.dataset.url = normalized;
     browseStatus.textContent = '';
     switchTab('browse');
     return true;
@@ -152,11 +152,12 @@
   };
 
   openNew.addEventListener('click', function () {
-    if (!this.dataset.url) {
+    const directUrl = this.dataset.url;
+    if (!directUrl) {
       browseStatus.textContent = 'Choose an approved app or enter an approved website first.';
       return;
     }
-    window.open(this.dataset.url, '_blank', 'noopener,noreferrer');
+    window.open(directUrl, '_blank', 'noopener,noreferrer');
   });
 
   searchForm.addEventListener('submit', async function (event) {
