@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Private Proxy logo</title>
+  <desc id="desc">A stylized shield with a globe and a lock representing private browsing.</desc>
+  <defs>
+    <linearGradient id="bg" x1="16" y1="14" x2="108" y2="110" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C6BFF"/>
+      <stop offset="1" stop-color="#42B9A0"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="34" y1="26" x2="96" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#E7F5FF" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+  <circle cx="64" cy="64" r="58" fill="url(#bg)"/>
+  <circle cx="64" cy="64" r="48" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.45)"/>
+  <path d="M64 20L88 28.5V58C88 78.3 77.3 92.8 64 100C50.7 92.8 40 78.3 40 58V28.5L64 20Z" fill="url(#shine)" fill-opacity="0.8"/>
+  <path d="M64 24L84 31.3V57.7C84 74.8 75.1 87.3 64 94.1C52.9 87.3 44 74.8 44 57.7V31.3L64 24Z" stroke="rgba(255,255,255,0.82)" stroke-width="2.5"/>
+  <circle cx="64" cy="57" r="16" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.9)" stroke-width="2"/>
+  <path d="M48 57H80M64 41V73M52 49C56 46.5 60 45 64 45C68 45 72 46.5 76 49M52 65C56 67.5 60 69 64 69C68 69 72 67.5 76 65" stroke="rgba(255,255,255,0.9)" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M66 74H62C58.7 74 56 76.7 56 80V84H70V80C70 76.7 67.3 74 64 74H66Z" fill="rgba(255,255,255,0.9)"/>
+  <rect x="56" y="65" width="16" height="13" rx="3" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.9)" stroke-width="2"/>
+</svg>

@@ -7,14 +7,15 @@
   <link rel="stylesheet" href="/static/style.css">
   <link rel="stylesheet" href="/static/tabs.css">
   <link rel="stylesheet" href="/static/background-upload.css">
-  <link rel="stylesheet" href="/static/dark-mode.css">
 </head>
 <body>
   <header class="topbar">
     <div class="container topbar-inner">
-      <a class="brand" href="/">Private Proxy</a>
+      <a class="brand" href="/">
+        <img class="brand-mark" src="/static/logo.svg" alt="" aria-hidden="true" />
+        <span>Private Proxy</span>
+      </a>
       <nav class="actions" aria-label="Main navigation">
-        <button id="themeToggle" class="secondary background-button" type="button" aria-pressed="false">🌙 Dark mode</button>
         <button id="chooseBackground" class="secondary background-button" type="button">Upload background</button>
         <button id="resetBackground" class="secondary background-button" type="button" hidden>Reset background</button>
         <input id="backgroundFile" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
@@ -54,8 +55,7 @@
           <input id="urlInput" placeholder="https://youtube.com" autocomplete="url" aria-label="Website URL">
           <div class="button-row">
             <button type="submit" class="primary">Browse site</button>
-            <button id="openNew" type="button" class="secondary">Open proxied site in new tab</button>
-            <button id="openDirect" type="button" class="secondary" hidden>Try direct open</button>
+            <button id="openNew" type="button" class="secondary">Open in new tab</button>
           </div>
         </form>
         <p class="muted allowed-label">Allowed hosts: <span id="allowedList">Loading…</span></p>
@@ -87,7 +87,6 @@
 
   <script src="/static/app.js"></script>
   <script src="/static/background.js"></script>
-  <script src="/static/dark-mode.js"></script>
   <script>
     document.getElementById('clearCookies').addEventListener('click', async () => {
       const response = await fetch('/api/clear-cookies', { method: 'POST' });
